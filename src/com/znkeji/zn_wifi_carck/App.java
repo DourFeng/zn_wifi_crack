@@ -5,10 +5,12 @@ import com.znkeji.zn_wifi_carck.utils.StringUtils;
 import com.znkeji.zn_wifi_carck.utils.WiFiUtils;
 import org.springframework.util.FileCopyUtils;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created with IntelliJ IDEA.
@@ -38,14 +40,13 @@ public class App {
 
         String path = App.class.getClassLoader().getResource("pwd.txt").getPath();
         BufferedReader reader = new BufferedReader(new FileReader(path));
+        List<String> list = reader.lines().collect(Collectors.toList());
+        // 倒叙密码
+        // Collections.reverse(list);
 
-
-        String pwd = null;
         int i = 0;
-        while((pwd = reader.readLine()) != null){
-
+        for (String pwd : list) {
             i++;
-
             System.out.println("开始连接："+i+" -->"+ssid+" - "+pwd);
             boolean success = connect(ssid, pwd);
             if(success){
@@ -74,7 +75,7 @@ public class App {
             printList(CmdUtils.execute("netsh wlan connect name=\""+ssid+"\"","./"));;
             //测试网络，使用ping的方式检测网络，此处建议优化改其他效率更高的方式，暂停2000毫秒是因为连接WiFi需要时间，这个时间因环境而异
             CmdUtils.execute("ipconfig","./");
-            Thread.sleep(2000);
+            Thread.sleep(5000);
             boolean success = ping();
             return success;
 
@@ -91,13 +92,30 @@ public class App {
      */
     private static List<String> getSsidList(List<String> resultList) {
         List<String> ssidList = new ArrayList<String>();
+        Map<String, Integer> map = new HashMap<>(resultList.size());
         //遍历result获得ssid
-        for (String result : resultList) {
-            if(result.startsWith("SSID")){
-                String ssid = result.substring(result.indexOf(":")+2);
-                ssidList.add(ssid);
+        for(int i = 0; i < resultList.size(); i++){
+            String result = resultList.get(i);
+            if(!result.startsWith("SSID")){
+                continue;
             }
+
+            String ssid = result.substring(result.indexOf(":")+2);
+            String xinHao = resultList.get(i + 5);
+            Integer signal = Integer.valueOf(xinHao.substring(xinHao.indexOf("%") - 2, xinHao.indexOf("%")));
+            map.put(ssid, signal);
         }
+
+        if (map.size() == 0) {
+            return ssidList;
+        }
+
+        System.out.println("wifi信号强度" + map);
+        LinkedHashMap<String, Integer> linkedHashMap = map.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (oldVal, newVal) -> oldVal, LinkedHashMap::new));
+        ssidList.addAll(linkedHashMap.keySet());
+        System.out.println("wifi信号强到弱排序" +  ssidList);
+
         return ssidList;
     }
 
